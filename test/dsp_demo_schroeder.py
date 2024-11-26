@@ -150,6 +150,3 @@ root.mainloop()
 # 等待线程结束
 #player_thread.join()
 
-print("Change some thing")
-
-print("change ")
