@@ -55,19 +55,20 @@ def update_plot(frame):
     # output_bytes = np.int16(signal_output * 32767).tobytes()
     stream.write(output_bytes)
 
-    # 更新输入信号时域
-    line_input_time.set_data(range(BLOCKLEN), audio_data)
-    # 更新输入信号频域
-    input_freq_data = np.abs(np.fft.rfft(audio_data)) / BLOCKLEN
-    input_freqs = np.fft.rfftfreq(BLOCKLEN, d=1.0 / RATE)
-    line_input_freq.set_data(input_freqs, input_freq_data)
+    # # 更新输入信号时域
+    # line_input_time.set_data(range(BLOCKLEN), audio_data)
+    # # 更新输入信号频域
+    # input_freq_data = np.abs(np.fft.rfft(audio_data)) / BLOCKLEN
+    # input_freqs = np.fft.rfftfreq(BLOCKLEN, d=1.0 / RATE)
+    # line_input_freq.set_data(input_freqs, input_freq_data)
 
-    # 更新输出信号时域
-    line_output_time.set_data(range(BLOCKLEN), signal_output[:BLOCKLEN])
-    # 更新输出信号频域
-    output_freq_data = np.abs(np.fft.rfft(signal_output[:BLOCKLEN])) / BLOCKLEN
-    output_freqs = np.fft.rfftfreq(BLOCKLEN, d=1.0 / RATE)
-    line_output_freq.set_data(output_freqs, output_freq_data)
+    # # 更新输出信号时域
+    # line_output_time.set_data(range(BLOCKLEN), signal_output[:BLOCKLEN])
+    # # 更新输出信号频域
+    # output_freq_data = np.abs(np.fft.rfft(signal_output[:BLOCKLEN])) / BLOCKLEN
+    # output_freqs = np.fft.rfftfreq(BLOCKLEN, d=1.0 / RATE)
+    # line_output_freq.set_data(output_freqs, output_freq_data)
+
 
     return line_input_time, line_input_freq, line_output_time, line_output_freq
 
@@ -148,8 +149,21 @@ def upload_file():
 def get_signal():
     global file_path
     if use_real_time.get():
+        # 实时麦克风输入
         input_bytes = stream.read(FPB, exception_on_overflow=False)
-        return np.frombuffer(input_bytes, dtype=np.int16).astype(np.float32) / 32768
+        signal = np.frombuffer(input_bytes, dtype=np.int16)
+        
+        # 如果是立体声,只保留一个声道
+        if CHANNELS > 1:
+            signal = signal[::CHANNELS]
+            
+        # 确保长度为FPB
+        if len(signal) > FPB:
+            signal = signal[:FPB]
+        elif len(signal) < FPB:
+            signal = np.pad(signal, (0, FPB - len(signal)))
+            
+        return signal.astype(np.float32) / 32768.0
     
     elif use_local_file.get() and file_path:
         # 读取本地文件
@@ -171,6 +185,9 @@ def get_signal():
 
             # 转换为float类型进行处理
             signal = signal.astype(np.float32) / 32768.0
+
+            # 读取完文件后重置 use_local_file 为 False
+            use_local_file.set(False) 
             return signal
 
     else:
