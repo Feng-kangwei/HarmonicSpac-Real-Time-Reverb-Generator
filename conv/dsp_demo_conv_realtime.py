@@ -23,9 +23,9 @@ def highpass_filter(data, cutoff=10, fs=16000, order=5):
     return filtered_data
 
 def add_room_reverb(input_signal, fs,
-                   room_dim=[10, 10, 10],
-                   source_pos=[10, 10, 10],
-                   receiver_pos=[10, 10, 10],
+                   room_dim=[5.0, 4.0, 6.0],
+                   source_pos=[2.0, 3.5, 2.0],
+                   receiver_pos=[2.0, 1.5, 2.0],
                    rt60=0.4):
     h = rir.generate(
         c=340,
@@ -81,47 +81,47 @@ def update_rt60(val):
 
 def update_room_dim_x(val):
     global room_dim
-    room_dim[0] = val
+    room_dim[0] = float(val)
     x_label.config(text=f"X: {room_dim[0]:.2f}")
 
 def update_room_dim_y(val):
     global room_dim
-    room_dim[1] = val
+    room_dim[1] = float(val)
     y_label.config(text=f"Y: {room_dim[1]:.2f}")
 
 def update_room_dim_z(val):
     global room_dim
-    room_dim[2] = val
+    room_dim[2] = float(val)
     z_label.config(text=f"Z: {room_dim[2]:.2f}")
 
 def update_source_pos_x(val):
     global source_pos
-    source_pos[0] = val
+    source_pos[0] = float(val)
     sx_label.config(text=f"X: {source_pos[0]:.2f}")
 
 def update_source_pos_y(val):
     global source_pos
-    source_pos[1] = val
+    source_pos[1] = float(val)
     sy_label.config(text=f"Y: {source_pos[1]:.2f}")
 
 def update_source_pos_z(val):
     global source_pos
-    source_pos[2] = val
+    source_pos[2] = float(val)
     sz_label.config(text=f"Z: {source_pos[2]:.2f}")
 
 def update_receiver_pos_x(val):
     global receiver_pos
-    receiver_pos[0] = val
+    receiver_pos[0] = float(val)
     rx_label.config(text=f"X: {receiver_pos[0]:.2f}")
 
 def update_receiver_pos_y(val):
     global receiver_pos
-    receiver_pos[1] = val
+    receiver_pos[1] = float(val)
     ry_label.config(text=f"Y: {receiver_pos[1]:.2f}")
 
 def update_receiver_pos_z(val):
     global receiver_pos
-    receiver_pos[2] = val
+    receiver_pos[2] = float(val)
     rz_label.config(text=f"Z: {receiver_pos[2]:.2f}")
 
 def toggle_signal_source():
@@ -187,9 +187,9 @@ if __name__ == "__main__":
         frames_per_buffer=FPB
     )
 
-    room_dim = [5, 4, 6]
-    source_pos = [2, 3.5, 2]
-    receiver_pos = [2, 1.5, 2]
+    room_dim = [5.0, 4.0, 6.0]
+    source_pos = [2.0, 3.5, 2.0]
+    receiver_pos = [2.0, 1.5, 2.0]
     rt60 = 0.4
     cutoff=10
 
