@@ -61,8 +61,8 @@ def plot_waveform(signal, title="Waveform"):
 
 # 使用示例
 if __name__ == "__main__":
-    input_file = "example.wav"
-    output_file = "output_room_reverb2.wav"
+    input_file = "conv/example.wav"
+    output_file = "conv/output_room_reverb2.wav"
     
     # 自定义房间参数
     room_config = {

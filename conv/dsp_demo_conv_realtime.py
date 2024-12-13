@@ -48,9 +48,11 @@ def add_room_reverb(input_signal, fs,
 def update_plot(frame):
     global audio_data, signal_output
     audio_data = get_signal()
-    audio_data=highpass_filter(audio_data,cutoff)
+    # audio_data = highpass_filter(audio_data,cutoff)
     signal_output = add_room_reverb(audio_data, RATE, room_dim, source_pos, receiver_pos, rt60)
-    output_bytes = np.int16(signal_output * 32767).tobytes()
+    # convert to int16
+    output_bytes = (signal_output * 32767).astype(np.int16).tobytes()
+    # output_bytes = np.int16(signal_output * 32767).tobytes()
     stream.write(output_bytes)
 
     # 更新输入信号时域
@@ -70,7 +72,6 @@ def update_plot(frame):
     return line_input_time, line_input_freq, line_output_time, line_output_freq
 
 # GUI update func
-
 def update_cutoff(val):
     global cutoff
     cutoff=float(val)
@@ -152,10 +153,26 @@ def get_signal():
     
     elif use_local_file.get() and file_path:
         # 读取本地文件
-        with wave.open(file_path, 'rb') as wf:
-            print("Read success")
-            signal = wf.readframes(FPB)
-            return np.frombuffer(signal, dtype=np.int16).astype(np.float32) / 32768
+        with wave.open(file_path, 'rb') as wav:
+            # 获取音频参数
+            n_channels = wav.getnchannels()
+            n_frames = wav.getnframes()
+            
+            # 读取音频数据并转换为numpy数组
+            signal = wav.readframes(n_frames)
+            signal = np.frombuffer(signal, dtype=np.int16)
+
+            # 重塑数组并只返回第一个声道
+            if n_channels > 1:
+                signal = signal.reshape(-1, n_channels)[:, 0]
+
+            # 重塑数组为(n_samples, n_channels)
+            # signal = signal.reshape(-1, n_channels)
+
+            # 转换为float类型进行处理
+            signal = signal.astype(np.float32) / 32768.0
+            return signal
+
     else:
         return np.zeros(FPB, dtype=np.float32)
 
@@ -172,7 +189,7 @@ def quit_application():
 if __name__ == "__main__":
     WIDTH = 2
     CHANNELS = 1
-    RATE = 16000
+    RATE = 8000
     FPB = 2048
     BLOCKLEN = FPB
 
@@ -182,7 +199,7 @@ if __name__ == "__main__":
         format=p.get_format_from_width(WIDTH),
         channels=CHANNELS,
         rate=RATE,
-        input=False,
+        input=True,
         output=True,
         frames_per_buffer=FPB
     )
