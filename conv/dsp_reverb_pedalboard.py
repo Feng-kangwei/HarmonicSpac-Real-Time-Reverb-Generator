@@ -205,26 +205,34 @@ class ReverbProcessor:
     def update_plots(self, frame):
         if not self.running:
             return self.input_time_line, self.input_freq_line, self.output_time_line, self.output_freq_line
-            
+
         try:
-            # 确保数据长度一致
-            time = np.arange(self.CHUNK)
+            desample_factor = 8
+            # 采样索引，每隔一个点取一个
+            sampled_indices = np.arange(0, self.CHUNK, desample_factor)
+            # 对时间轴进行采样
+            time = sampled_indices
             freq = np.fft.rfftfreq(self.CHUNK, 1/self.RATE)
-            
-            # 更新时域图
-            self.input_time_line.set_data(time, self.input_data)
-            self.output_time_line.set_data(time, self.output_data)
-            
+
+            # 更新时域图，采样数据
+            self.input_time_line.set_data(time, self.input_data[0][sampled_indices])
+            self.output_time_line.set_data(time, self.output_data[0][sampled_indices])
+
             # 更新频域图
-            input_fft = np.abs(np.fft.rfft(self.input_data))
-            output_fft = np.abs(np.fft.rfft(self.output_data))
-            
-            self.input_freq_line.set_data(freq, input_fft)
-            self.output_freq_line.set_data(freq, output_fft)
-            
+            input_fft = np.abs(np.fft.rfft(self.input_data[0]))
+            output_fft = np.abs(np.fft.rfft(self.output_data[0]))
+
+            # 对频域数据进行采样
+            freq_sampled = freq[::desample_factor]
+            input_fft_sampled = input_fft[::desample_factor]
+            output_fft_sampled = output_fft[::desample_factor]
+
+            self.input_freq_line.set_data(freq_sampled, input_fft_sampled)
+            self.output_freq_line.set_data(freq_sampled, output_fft_sampled)
+
         except Exception as e:
             print(f"更新图表错误: {str(e)}")
-            
+
         return self.input_time_line, self.input_freq_line, self.output_time_line, self.output_freq_line
     
     def toggle_processing(self):
@@ -323,7 +331,7 @@ class ReverbProcessor:
             self.fig,
             self.update_plots,
             frames=None,  # 无限帧
-            interval=200, # 更新间隔
+            interval=50, # 更新间隔
             blit=True,
             cache_frame_data=False,  # 禁用帧缓存
             save_count=None  # 不保存帧
