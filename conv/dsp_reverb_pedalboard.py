@@ -5,12 +5,13 @@ from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.animation import FuncAnimation
-from pedalboard import Pedalboard, Reverb
+from pedalboard import Pedalboard, Reverb, HighpassFilter, LowpassFilter
+import wave
 
 class ReverbProcessor:
     def __init__(self):
         # 音频参数
-        self.CHUNK = 1024
+        self.CHUNK = 8192*4 
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1
         self.RATE = 44100
@@ -28,6 +29,8 @@ class ReverbProcessor:
         
         # 创建效果器实例
         self.board = Pedalboard([
+            HighpassFilter(cutoff_frequency_hz=100.0),    # 移除100 Hz以下低频噪声
+            LowpassFilter(cutoff_frequency_hz=5000.0),    # 限制高频到5 kHz以下
             Reverb(
                 room_size=self.room_size,
                 wet_level=self.wet_level,
@@ -38,6 +41,10 @@ class ReverbProcessor:
         
         self.debug = True  # 添加调试标志
         
+        self.is_recording = False
+        self.recorded_input = []
+        self.recorded_output = []
+
         try:
             # 初始化PyAudio
             self.p = pyaudio.PyAudio()
@@ -55,30 +62,29 @@ class ReverbProcessor:
             messagebox.showerror("错误", f"音频设备初始化失败: {str(e)}")
             raise
     
+
     def audio_callback(self, in_data, frame_count, time_info, status):
         try:
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
             
-            # 确保数据维度正确
-            if audio_data.ndim == 1:
-                audio_data = audio_data.reshape(-1, 1)
-            
-            # 应用效果
+            # 将一维数据转换为二维数据 (1, samples)
+            audio_data = np.expand_dims(audio_data, axis=0)
+                
+            # 使用 Pedalboard 处理
             processed = self.board(audio_data, self.RATE)
-            
-            # 确保输出数据格式正确
-            if processed.ndim > 1:
-                processed = processed.flatten()
-            
+                
             # 更新数据缓冲
-            self.input_data = audio_data.flatten()
+            self.input_data = audio_data
             self.output_data = processed
             
-            # 添加音量限制
-            processed = np.clip(processed, -1.0, 1.0)
-            
+            # 录制音频
+            if self.is_recording:
+                self.recorded_input.extend(self.input_data)
+                self.recorded_output.extend(self.output_data)
+                
             return (processed.tobytes(), pyaudio.paContinue)
+            
         except Exception as e:
             print(f"音频处理错误: {str(e)}")
             return (in_data, pyaudio.paContinue)
@@ -114,6 +120,14 @@ class ReverbProcessor:
         self.start_button = ttk.Button(control_frame, text="开始", command=self.toggle_processing)
         self.start_button.pack(pady=10)
         
+        # 添加录制按钮
+        self.record_button = ttk.Button(control_frame, text="录制", command=self.toggle_recording)
+        self.record_button.pack(pady=5)
+        
+        # 添加保存按钮
+        self.save_button = ttk.Button(control_frame, text="保存", command=self.save_audio)
+        self.save_button.pack(pady=5)
+        
         self.setup_plots()
     
     def setup_plots(self):
@@ -127,44 +141,63 @@ class ReverbProcessor:
         time = np.arange(self.CHUNK)
         freq = np.fft.rfftfreq(self.CHUNK, 1/self.RATE)
         
-        # 输入时域
+        # 输入时域 - 调整y轴范围
         self.input_time_line, = self.axs[0,0].plot(time, np.zeros(self.CHUNK))
         self.axs[0,0].set_title("Input (Time Domain)")
-        self.axs[0,0].set_ylim(-1, 1)
+        self.axs[0,0].set_ylim(-0.5, 0.5)  # 调整为更合适的范围
+        self.axs[0,0].grid(True)
         
         # 输入频域
         self.input_freq_line, = self.axs[0,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[0,1].set_title("Input (Frequency Domain)")
+        self.axs[0,1].set_ylim(0, 0.1)  # 设置频域图的y轴范围
+        self.axs[0,1].grid(True)
         
         # 输出时域和频域
         self.output_time_line, = self.axs[1,0].plot(time, np.zeros(self.CHUNK))
-        self.output_freq_line, = self.axs[1,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
-        
         self.axs[1,0].set_title("Output (Time Domain)")
+        self.axs[1,0].set_ylim(-0.5, 0.5)  # 与输入保持一致
+        self.axs[1,0].grid(True)
+        
+        self.output_freq_line, = self.axs[1,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[1,1].set_title("Output (Frequency Domain)")
+        self.axs[1,1].set_ylim(0, 0.1)  # 与输入保持一致
+        self.axs[1,1].grid(True)
+        
+        # 添加标签
+        for ax in self.axs.flat:
+            # 字体大小
+            ax.tick_params(axis='both', labelsize=8)
+            ax.set_xlabel('Samples' if 'Time' in ax.get_title() else 'Frequency (Hz)')
+            ax.set_ylabel('Amplitude')
         
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(expand=True, fill=tk.BOTH)
     
     def update_plots(self, frame):
-        if self.debug:
-            print(f"更新帧: {frame}, 运行状态: {self.running}")
-
         if not self.running:
             return self.input_time_line, self.input_freq_line, self.output_time_line, self.output_freq_line
-
-        # 更新时域图
-        self.input_time_line.set_ydata(self.input_data)
-        self.output_time_line.set_ydata(self.output_data)
-        
-        # 更新频域图
-        input_fft = np.abs(np.fft.rfft(self.input_data))
-        output_fft = np.abs(np.fft.rfft(self.output_data))
-        
-        self.input_freq_line.set_ydata(input_fft)
-        self.output_freq_line.set_ydata(output_fft)
-        
+            
+        try:
+            # 确保数据长度一致
+            time = np.arange(self.CHUNK)
+            freq = np.fft.rfftfreq(self.CHUNK, 1/self.RATE)
+            
+            # 更新时域图
+            self.input_time_line.set_data(time, self.input_data)
+            self.output_time_line.set_data(time, self.output_data)
+            
+            # 更新频域图
+            input_fft = np.abs(np.fft.rfft(self.input_data))
+            output_fft = np.abs(np.fft.rfft(self.output_data))
+            
+            self.input_freq_line.set_data(freq, input_fft)
+            self.output_freq_line.set_data(freq, output_fft)
+            
+        except Exception as e:
+            print(f"更新图表错误: {str(e)}")
+            
         return self.input_time_line, self.input_freq_line, self.output_time_line, self.output_freq_line
     
     def toggle_processing(self):
@@ -182,6 +215,8 @@ class ReverbProcessor:
     def update_reverb(self):
         # 更新效果器参数
         self.board = Pedalboard([
+            HighpassFilter(cutoff_frequency_hz=100.0),    # 移除100 Hz以下低频噪声
+            LowpassFilter(cutoff_frequency_hz=5000.0),   
             Reverb(
                 room_size=self.room_size,
                 wet_level=self.wet_level,
@@ -190,6 +225,52 @@ class ReverbProcessor:
             )
         ])
     
+    def toggle_recording(self):
+        self.is_recording = not self.is_recording
+        self.record_button.config(text="停止录制" if self.is_recording else "录制")
+        if not self.is_recording and self.recorded_input:
+            self.save_button.config(state="normal")
+        if self.is_recording:
+            self.recorded_input = []
+            self.recorded_output = []
+            self.save_button.config(state="disabled")
+
+    def save_audio(self):
+        if not self.recorded_input or not self.recorded_output:
+            messagebox.showwarning("警告", "没有可保存的录音")
+            return
+            
+        from tkinter import filedialog
+        input_file = filedialog.asksaveasfilename(
+            defaultextension=".wav",
+            filetypes=[("WAV files", "*.wav")]
+        )
+        
+        if input_file:
+            output_file = input_file.replace(".wav", "_processed.wav")
+            
+            # 保存输入和输出
+            self._save_wav(input_file, np.concatenate(self.recorded_input))
+            self._save_wav(output_file, np.concatenate(self.recorded_output))
+                
+            messagebox.showinfo("成功", 
+                f"文件已保存:\n输入: {input_file}\n输出: {output_file}")
+
+    def _save_wav(self, filename, data):
+        """保存WAV文件"""
+        
+        # 确保数据范围在 [-1, 1] 之间
+        data = np.clip(data, -1, 1)
+        
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(self.CHANNELS)
+            wf.setsampwidth(2)  # 使用16位采样
+            wf.setframerate(self.RATE)
+            
+            # 转换为16位整数
+            data_int = (data * 32767).astype(np.int16)
+            wf.writeframes(data_int.tobytes())
+
     def on_closing(self):
         self.running = False
         if hasattr(self, 'stream'):
