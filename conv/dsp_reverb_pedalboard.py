@@ -116,13 +116,23 @@ class ReverbProcessor:
         )
         self.wet_level_slider.pack()
 
-        # # damping滑块
-        # ttk.Label(control_frame, text="Damping").pack()
-        # self.damping_slider = ttk.Scale(
-        #     control_frame, from_=0, to=1,
-        #     value=self.damping,
-        #     command=self.
-        # )
+        # damping滑块
+        ttk.Label(control_frame, text="Damping").pack()
+        self.damping_slider = ttk.Scale(
+            control_frame, from_=0, to=1,
+            value=self.damping,
+            command=self.update_damping
+        )
+        self.damping_slider.pack()
+
+        # Width滑块
+        ttk.Label(control_frame, text="Width").pack()
+        self.width_slider = ttk.Scale(
+            control_frame, from_=0, to=1,
+            value=self.width,
+            command=self.update_width
+        )   
+        self.width_slider.pack()
         
         # 启动按钮
         self.start_button = ttk.Button(control_frame, text="开始", command=self.toggle_processing)
@@ -218,6 +228,14 @@ class ReverbProcessor:
         
     def update_wet_level(self, value):
         self.wet_level = float(value)
+        self.update_reverb()
+    
+    def update_damping(self, value):
+        self.damping = float(value)
+        self.update_reverb()
+
+    def update_width(self, value):
+        self.width = float(value)
         self.update_reverb()
         
     def update_reverb(self):
