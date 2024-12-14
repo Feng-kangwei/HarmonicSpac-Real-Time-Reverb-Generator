@@ -162,32 +162,41 @@ class ReverbProcessor:
         # 输入时域 - 调整y轴范围
         self.input_time_line, = self.axs[0,0].plot(time, np.zeros(self.CHUNK))
         self.axs[0,0].set_title("Input (Time Domain)")
+        self.axs[0,0].title.set_size(8)
         self.axs[0,0].set_ylim(-0.5, 0.5)  # 调整为更合适的范围
+        self.axs[0,0].tick_params(axis='both', labelsize=6)
         self.axs[0,0].grid(True)
         
         # 输入频域
         self.input_freq_line, = self.axs[0,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[0,1].set_title("Input (Frequency Domain)")
+        self.axs[0,1].title.set_size(8)
         self.axs[0,1].set_ylim(0, 200)  # 设置频域图的y轴范围
+        self.axs[0,1].tick_params(axis='both', labelsize=6)
         self.axs[0,1].grid(True)
         
         # 输出时域和频域
         self.output_time_line, = self.axs[1,0].plot(time, np.zeros(self.CHUNK))
         self.axs[1,0].set_title("Output (Time Domain)")
+        self.axs[1,0].title.set_size(8)
         self.axs[1,0].set_ylim(-0.5, 0.5)  # 与输入保持一致
+        self.axs[1,0].tick_params(axis='both', labelsize=6)
         self.axs[1,0].grid(True)
         
         self.output_freq_line, = self.axs[1,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[1,1].set_title("Output (Frequency Domain)")
+        self.axs[1,1].title.set_size(8)
         self.axs[1,1].set_ylim(0, 200)  # 与输入保持一致
+        self.axs[1,1].tick_params(axis='both', labelsize=6)
         self.axs[1,1].grid(True)
         
         # 添加标签
         for ax in self.axs.flat:
-            # 字体大小
-            ax.tick_params(axis='both', labelsize=6)
             ax.set_xlabel('Samples' if 'Time' in ax.get_title() else 'Frequency (Hz)')
             ax.set_ylabel('Amplitude')
+            # set label font size
+            ax.xaxis.label.set_size(8)
+            ax.yaxis.label.set_size(8)
         
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
         self.canvas.draw()
