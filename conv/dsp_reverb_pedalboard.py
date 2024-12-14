@@ -25,7 +25,7 @@ class ReverbProcessor:
         self.room_size = 0.8  # 增大房间大小
         self.wet_level = 0.7  # 增加湿信号比例
         self.damping = 0.5    # 添加阻尼
-        self.width = 1.0      # 增加立体声宽度
+        self.width = 0.5      # 增加立体声宽度
         
         # 创建效果器实例
         self.board = Pedalboard([
@@ -163,7 +163,7 @@ class ReverbProcessor:
         self.input_time_line, = self.axs[0,0].plot(time, np.zeros(self.CHUNK))
         self.axs[0,0].set_title("Input (Time Domain)")
         self.axs[0,0].title.set_size(8)
-        self.axs[0,0].set_ylim(-0.5, 0.5)  # 调整为更合适的范围
+        self.axs[0,0].set_ylim(-1, 1)  # 调整为更合适的范围
         self.axs[0,0].tick_params(axis='both', labelsize=6)
         self.axs[0,0].grid(True)
         
@@ -179,7 +179,7 @@ class ReverbProcessor:
         self.output_time_line, = self.axs[1,0].plot(time, np.zeros(self.CHUNK))
         self.axs[1,0].set_title("Output (Time Domain)")
         self.axs[1,0].title.set_size(8)
-        self.axs[1,0].set_ylim(-0.5, 0.5)  # 与输入保持一致
+        self.axs[1,0].set_ylim(-1, 1)  # 与输入保持一致
         self.axs[1,0].tick_params(axis='both', labelsize=6)
         self.axs[1,0].grid(True)
         
@@ -323,7 +323,7 @@ class ReverbProcessor:
             self.fig,
             self.update_plots,
             frames=None,  # 无限帧
-            interval=50,  # 50ms 更新间隔
+            interval=200, # 更新间隔
             blit=True,
             cache_frame_data=False,  # 禁用帧缓存
             save_count=None  # 不保存帧
