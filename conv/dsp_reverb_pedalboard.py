@@ -11,10 +11,10 @@ import wave
 class ReverbProcessor:
     def __init__(self):
         # 音频参数
-        self.CHUNK = 8192*4 
+        self.CHUNK = 8192
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1
-        self.RATE = 44100
+        self.RATE = 16000
         self.running = False
         
         # 数据缓冲
@@ -115,6 +115,14 @@ class ReverbProcessor:
             command=self.update_wet_level
         )
         self.wet_level_slider.pack()
+
+        # # damping滑块
+        # ttk.Label(control_frame, text="Damping").pack()
+        # self.damping_slider = ttk.Scale(
+        #     control_frame, from_=0, to=1,
+        #     value=self.damping,
+        #     command=self.
+        # )
         
         # 启动按钮
         self.start_button = ttk.Button(control_frame, text="开始", command=self.toggle_processing)
@@ -150,7 +158,7 @@ class ReverbProcessor:
         # 输入频域
         self.input_freq_line, = self.axs[0,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[0,1].set_title("Input (Frequency Domain)")
-        self.axs[0,1].set_ylim(0, 0.1)  # 设置频域图的y轴范围
+        self.axs[0,1].set_ylim(0, 200)  # 设置频域图的y轴范围
         self.axs[0,1].grid(True)
         
         # 输出时域和频域
@@ -161,13 +169,13 @@ class ReverbProcessor:
         
         self.output_freq_line, = self.axs[1,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[1,1].set_title("Output (Frequency Domain)")
-        self.axs[1,1].set_ylim(0, 0.1)  # 与输入保持一致
+        self.axs[1,1].set_ylim(0, 200)  # 与输入保持一致
         self.axs[1,1].grid(True)
         
         # 添加标签
         for ax in self.axs.flat:
             # 字体大小
-            ax.tick_params(axis='both', labelsize=8)
+            ax.tick_params(axis='both', labelsize=6)
             ax.set_xlabel('Samples' if 'Time' in ax.get_title() else 'Frequency (Hz)')
             ax.set_ylabel('Amplitude')
         
