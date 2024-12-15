@@ -19,7 +19,6 @@ class ReverbProcessor:
         self.RATE = 16000
         self.running = False
 
-        
         # 数据缓冲
         self.input_data = np.zeros(self.CHUNK)
         self.output_data = np.zeros(self.CHUNK)
@@ -84,6 +83,10 @@ class ReverbProcessor:
 
     def audio_callback(self, in_data, frame_count, time_info, status):
         try:
+            if not self.running:
+                # 如果未开始播放，返回静音数据
+                return (np.zeros(frame_count * 4).tobytes(), pyaudio.paContinue)
+                
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
             
@@ -124,64 +127,78 @@ class ReverbProcessor:
         self.use_pedalboard = tk.BooleanVar(value=False)
         self.use_rir = tk.BooleanVar(value=False)
         
+
         # 控制面板
         control_frame = ttk.Frame(self.root)
         control_frame.pack(side=tk.LEFT, padx=10)
 
-        # ALGORITHM选择
-        ttk.Label(control_frame, text="Algorithm Choose").pack()
+        # 使用自定义样式的ALGORITHM选择框架
+        algorithm_frame = ttk.LabelFrame(control_frame, text="Algorithm Choose")
+        algorithm_frame.pack(pady=10, padx=15, fill="x")
+        algorithm_frame.config(width=200, height=100)
+
+
         ttk.Checkbutton(
-            control_frame, 
+            algorithm_frame, 
             text="Schroeder",
             variable=self.use_pedalboard,
             command= lambda : self.on_algorithm_change('pedalboard')
-        ).pack()
+        ).pack(padx=5, pady=2)
 
         ttk.Checkbutton(
-            control_frame, 
+            algorithm_frame, 
             text="Convolution",
             variable=self.use_rir,
             command=lambda : self.on_algorithm_change('rir')
-        ).pack()
+        ).pack(padx=5, pady=2)
         
+        pedalboard_frame = ttk.LabelFrame(control_frame, text="Pedalboard Parameters")
+        pedalboard_frame.pack(pady=10, padx=5, fill="x")
+
         # Room Size滑块
-        ttk.Label(control_frame, text="Room Size").pack()
+        ttk.Label(pedalboard_frame, text="Room Size").pack()
         self.room_size_slider = ttk.Scale(
-            control_frame, from_=0, to=1,
+            pedalboard_frame, from_=0, to=1,
             value=self.room_size,
             command=self.update_room_size
         )
         self.room_size_slider.pack()
         
         # Wet Level滑块
-        ttk.Label(control_frame, text="Wet Level").pack()
+        ttk.Label(pedalboard_frame, text="Wet Level").pack()
         self.wet_level_slider = ttk.Scale(
-            control_frame, from_=0, to=1,
+            pedalboard_frame, from_=0, to=1,
             value=self.wet_level,
             command=self.update_wet_level
         )
         self.wet_level_slider.pack()
 
         # damping滑块
-        ttk.Label(control_frame, text="Damping").pack()
+        ttk.Label(pedalboard_frame, text="Damping").pack()
         self.damping_slider = ttk.Scale(
-            control_frame, from_=0, to=1,
+            pedalboard_frame, from_=0, to=1,
             value=self.damping,
             command=self.update_damping
         )
         self.damping_slider.pack()
 
         # Width滑块
-        ttk.Label(control_frame, text="Width").pack()
+        ttk.Label(pedalboard_frame, text="Width").pack()
         self.width_slider = ttk.Scale(
-            control_frame, from_=0, to=1,
+            pedalboard_frame, from_=0, to=1,
             value=self.width,
             command=self.update_width
         )   
         self.width_slider.pack()
+
+        # frame for rir generator
+        rir_frame = ttk.LabelFrame(control_frame, text="RIR Generator Parameters")
+        rir_frame.pack(pady=10, padx=5, fill="x")
+
+        
         
         # 启动按钮
-        self.start_button = ttk.Button(control_frame, text="Start Plotting", command=self.toggle_processing)
+        self.start_button = ttk.Button(control_frame, text="Start", command=self.toggle_processing)
         self.start_button.pack(pady=10)
         
         # 添加录制按钮
@@ -287,7 +304,7 @@ class ReverbProcessor:
     
     def toggle_processing(self):
         self.running = not self.running
-        self.start_button.config(text="Stopping Plotting" if self.running else "Start Plotting")
+        self.start_button.config(text="Stop" if self.running else "Start")
 
     def on_algorithm_change(self, source):
         if not self.use_pedalboard.get() and not self.use_rir.get():
