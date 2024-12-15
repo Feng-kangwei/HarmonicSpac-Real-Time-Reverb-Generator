@@ -119,7 +119,7 @@ class ReverbProcessor:
 
     def setup_gui(self):
         self.root = tk.Tk()
-        self.root.title("Pedalboard Reverb")
+        self.root.title("Reverb")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.use_pedalboard = tk.BooleanVar(value=False)
         self.use_rir = tk.BooleanVar(value=False)
@@ -181,15 +181,15 @@ class ReverbProcessor:
         self.width_slider.pack()
         
         # 启动按钮
-        self.start_button = ttk.Button(control_frame, text="开始画图", command=self.toggle_processing)
+        self.start_button = ttk.Button(control_frame, text="Start Plotting", command=self.toggle_processing)
         self.start_button.pack(pady=10)
         
         # 添加录制按钮
-        self.record_button = ttk.Button(control_frame, text="录制", command=self.toggle_recording)
+        self.record_button = ttk.Button(control_frame, text="Record Audio", command=self.toggle_recording)
         self.record_button.pack(pady=5)
         
         # 添加保存按钮
-        self.save_button = ttk.Button(control_frame, text="保存", command=self.save_audio)
+        self.save_button = ttk.Button(control_frame, text="Save Audio", command=self.save_audio)
         self.save_button.pack(pady=5)
         
         self.setup_plots()
@@ -209,7 +209,7 @@ class ReverbProcessor:
         self.input_time_line, = self.axs[0,0].plot(time, np.zeros(self.CHUNK))
         self.axs[0,0].set_title("Input (Time Domain)")
         self.axs[0,0].title.set_size(8)
-        self.axs[0,0].set_ylim(-1, 1)  # 调整为更合适的范围
+        self.axs[0,0].set_ylim(-1, 1)  
         self.axs[0,0].tick_params(axis='both', labelsize=6)
         self.axs[0,0].grid(True)
         
@@ -217,7 +217,7 @@ class ReverbProcessor:
         self.input_freq_line, = self.axs[0,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[0,1].set_title("Input (Frequency Domain)")
         self.axs[0,1].title.set_size(8)
-        self.axs[0,1].set_ylim(0, 200)  # 设置频域图的y轴范围
+        self.axs[0,1].set_ylim(0, 200)  
         self.axs[0,1].tick_params(axis='both', labelsize=6)
         self.axs[0,1].grid(True)
         
@@ -225,14 +225,14 @@ class ReverbProcessor:
         self.output_time_line, = self.axs[1,0].plot(time, np.zeros(self.CHUNK))
         self.axs[1,0].set_title("Output (Time Domain)")
         self.axs[1,0].title.set_size(8)
-        self.axs[1,0].set_ylim(-1, 1)  # 与输入保持一致
+        self.axs[1,0].set_ylim(-1, 1)  
         self.axs[1,0].tick_params(axis='both', labelsize=6)
         self.axs[1,0].grid(True)
         
         self.output_freq_line, = self.axs[1,1].plot(freq, np.zeros(self.CHUNK//2 + 1))
         self.axs[1,1].set_title("Output (Frequency Domain)")
         self.axs[1,1].title.set_size(8)
-        self.axs[1,1].set_ylim(0, 200)  # 与输入保持一致
+        self.axs[1,1].set_ylim(0, 200)  
         self.axs[1,1].tick_params(axis='both', labelsize=6)
         self.axs[1,1].grid(True)
         
@@ -259,9 +259,6 @@ class ReverbProcessor:
             # 对时间轴进行采样
             time = sampled_indices
             freq = np.fft.rfftfreq(self.CHUNK, 1/self.RATE)
-
-            # print(self.input_data.shape)
-            # print(self.output_data.shape)
             
             # 确保使用一维数据进行绘图
             input_data_1d = self.input_data[0] if self.input_data.ndim > 1 else self.input_data
@@ -290,7 +287,7 @@ class ReverbProcessor:
     
     def toggle_processing(self):
         self.running = not self.running
-        self.start_button.config(text="停止画图" if self.running else "开始画图")
+        self.start_button.config(text="Stopping Plotting" if self.running else "Start Plotting")
 
     def on_algorithm_change(self, source):
         if not self.use_pedalboard.get() and not self.use_rir.get():
@@ -326,7 +323,7 @@ class ReverbProcessor:
         if self.use_pedalboard.get():
             # 更新效果器参数
             self.board = Pedalboard([
-                HighpassFilter(cutoff_frequency_hz=100.0),    # 移除100Hz以下低频噪声
+                HighpassFilter(cutoff_frequency_hz=100.0),   
                 LowpassFilter(cutoff_frequency_hz=5000.0),   
                 Reverb(
                     room_size=self.room_size,
@@ -348,7 +345,7 @@ class ReverbProcessor:
     
     def toggle_recording(self):
         self.is_recording = not self.is_recording
-        self.record_button.config(text="停止录制" if self.is_recording else "录制")
+        self.record_button.config(text="Stop Recording" if self.is_recording else "Record Audio")
         if not self.is_recording and self.recorded_input:
             self.save_button.config(state="normal")
         if self.is_recording:
@@ -358,7 +355,7 @@ class ReverbProcessor:
 
     def save_audio(self):
         if not self.recorded_input or not self.recorded_output:
-            messagebox.showwarning("警告", "没有可保存的录音")
+            messagebox.showwarning("Warning", "There is no audio to save.")
             return
             
         from tkinter import filedialog
@@ -374,8 +371,8 @@ class ReverbProcessor:
             self._save_wav(input_file, np.concatenate(self.recorded_input))
             self._save_wav(output_file, np.concatenate(self.recorded_output))
                 
-            messagebox.showinfo("成功", 
-                f"文件已保存:\n输入: {input_file}\n输出: {output_file}")
+            messagebox.showinfo("Success", 
+                f"Audio Saved:\nInput Audio: {input_file}\nOutput Audio: {output_file}")
 
     def _save_wav(self, filename, data):
         """保存WAV文件"""
