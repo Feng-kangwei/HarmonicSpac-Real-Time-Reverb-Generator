@@ -7,6 +7,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.animation import FuncAnimation
 from pedalboard import Pedalboard, Reverb, HighpassFilter, LowpassFilter
 import wave
+import rir_generator as rir
+import scipy.signal as ss
 
 class ReverbProcessor:
     def __init__(self):
@@ -38,13 +40,27 @@ class ReverbProcessor:
                 width=self.width
             )
         ])
-        
-        self.debug = True  # 添加调试标志
+
+        # RIR Generator 参数
+
+        # rir generator
+        self.h = rir.generate(
+                c=340,
+                fs=self.RATE,
+                r=[2, 1.5, 2],
+                s=[2, 3.5, 2],
+                L=[5, 4, 6],
+                reverberation_time=0.4,
+                nsample=1024)
+    
+        self.h = self.h.reshape(-1,1)
+
         
         self.is_recording = False
         self.recorded_input = []
         self.recorded_output = []
 
+    
         try:
             # 初始化PyAudio
             self.p = pyaudio.PyAudio()
@@ -68,11 +84,15 @@ class ReverbProcessor:
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
             
-            # 将一维数据转换为二维数据 (1, samples)
-            audio_data = np.expand_dims(audio_data, axis=0)
+            # # 将一维数据转换为二维数据 (1, samples)
+            # audio_data = np.expand_dims(audio_data, axis=0)
                 
-            # 使用 Pedalboard 处理
-            processed = self.board(audio_data, self.RATE)
+            # # 使用 Pedalboard 处理
+            # processed = self.board(audio_data, self.RATE)
+
+            # 使用rir generator处理
+            processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
+            processed = processed.astype(np.float32)
                 
             # 更新数据缓冲
             self.input_data = audio_data
@@ -324,8 +344,6 @@ class ReverbProcessor:
         self.root.destroy()
         
     def run(self):
-        if self.debug:
-            print("启动动画更新...")
             
         self.ani = FuncAnimation(
             self.fig,
@@ -336,9 +354,6 @@ class ReverbProcessor:
             cache_frame_data=False,  # 禁用帧缓存
             save_count=None  # 不保存帧
         )
-        
-        if self.debug:
-            print("开始主循环...")
             
         self.root.mainloop()
 
