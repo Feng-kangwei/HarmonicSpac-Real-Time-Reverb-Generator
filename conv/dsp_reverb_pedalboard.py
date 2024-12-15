@@ -18,6 +18,7 @@ class ReverbProcessor:
         self.CHANNELS = 1
         self.RATE = 16000
         self.running = False
+
         
         # 数据缓冲
         self.input_data = np.zeros(self.CHUNK)
@@ -42,20 +43,22 @@ class ReverbProcessor:
         ])
 
         # RIR Generator 参数
+        self.room_dim = [5, 4, 6]
+        self.source_pos = [2, 3.5, 2]
+        self.receiver_pos = [2, 1.5, 2]
+        self.rt60 = 0.4
 
         # rir generator
         self.h = rir.generate(
                 c=340,
                 fs=self.RATE,
-                r=[2, 1.5, 2],
-                s=[2, 3.5, 2],
-                L=[5, 4, 6],
-                reverberation_time=0.4,
+                L=self.room_dim,
+                s=self.source_pos,
+                r=self.receiver_pos,
+                reverberation_time=self.rt60,
                 nsample=1024)
-    
         self.h = self.h.reshape(-1,1)
 
-        
         self.is_recording = False
         self.recorded_input = []
         self.recorded_output = []
@@ -84,16 +87,21 @@ class ReverbProcessor:
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
             
-            # # 将一维数据转换为二维数据 (1, samples)
-            # audio_data = np.expand_dims(audio_data, axis=0)
-                
-            # # 使用 Pedalboard 处理
-            # processed = self.board(audio_data, self.RATE)
 
-            # 使用rir generator处理
-            processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
-            processed = processed.astype(np.float32)
-                
+            if (self.use_pedalboard.get()):
+                # 将一维数据转换为二维数据 (1, samples)
+                audio_data = np.expand_dims(audio_data, axis=0)
+                    
+                # 使用 Pedalboard 处理
+                processed = self.board(audio_data, self.RATE)
+            elif (self.use_rir.get()): 
+                # 使用rir generator处理
+                processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
+                processed = processed.astype(np.float32)
+            else :
+                # print("No algorithm selected")
+                processed = audio_data
+            
             # 更新数据缓冲
             self.input_data = audio_data
             self.output_data = processed
@@ -113,10 +121,28 @@ class ReverbProcessor:
         self.root = tk.Tk()
         self.root.title("Pedalboard Reverb")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.use_pedalboard = tk.BooleanVar(value=False)
+        self.use_rir = tk.BooleanVar(value=False)
         
         # 控制面板
         control_frame = ttk.Frame(self.root)
         control_frame.pack(side=tk.LEFT, padx=10)
+
+        # ALGORITHM选择
+        ttk.Label(control_frame, text="Algorithm Choose").pack()
+        ttk.Checkbutton(
+            control_frame, 
+            text="Schroeder",
+            variable=self.use_pedalboard,
+            command= lambda : self.on_algorithm_change('pedalboard')
+        ).pack()
+
+        ttk.Checkbutton(
+            control_frame, 
+            text="Convolution",
+            variable=self.use_rir,
+            command=lambda : self.on_algorithm_change('rir')
+        ).pack()
         
         # Room Size滑块
         ttk.Label(control_frame, text="Room Size").pack()
@@ -155,7 +181,7 @@ class ReverbProcessor:
         self.width_slider.pack()
         
         # 启动按钮
-        self.start_button = ttk.Button(control_frame, text="开始", command=self.toggle_processing)
+        self.start_button = ttk.Button(control_frame, text="开始画图", command=self.toggle_processing)
         self.start_button.pack(pady=10)
         
         # 添加录制按钮
@@ -234,13 +260,20 @@ class ReverbProcessor:
             time = sampled_indices
             freq = np.fft.rfftfreq(self.CHUNK, 1/self.RATE)
 
+            # print(self.input_data.shape)
+            # print(self.output_data.shape)
+            
+            # 确保使用一维数据进行绘图
+            input_data_1d = self.input_data[0] if self.input_data.ndim > 1 else self.input_data
+            output_data_1d = self.output_data[0] if self.output_data.ndim > 1 else self.output_data
+
             # 更新时域图，采样数据
-            self.input_time_line.set_data(time, self.input_data[0][sampled_indices])
-            self.output_time_line.set_data(time, self.output_data[0][sampled_indices])
+            self.input_time_line.set_data(time,input_data_1d[sampled_indices])
+            self.output_time_line.set_data(time, output_data_1d[sampled_indices])
 
             # 更新频域图
-            input_fft = np.abs(np.fft.rfft(self.input_data[0]))
-            output_fft = np.abs(np.fft.rfft(self.output_data[0]))
+            input_fft = np.abs(np.fft.rfft(input_data_1d))
+            output_fft = np.abs(np.fft.rfft(output_data_1d))
 
             # 对频域数据进行采样
             freq_sampled = freq[::desample_factor]
@@ -257,7 +290,21 @@ class ReverbProcessor:
     
     def toggle_processing(self):
         self.running = not self.running
-        self.start_button.config(text="停止" if self.running else "开始")
+        self.start_button.config(text="停止画图" if self.running else "开始画图")
+
+    def on_algorithm_change(self, source):
+        if not self.use_pedalboard.get() and not self.use_rir.get():
+            print("No algorithm selected")
+            return
+
+        if (self.use_pedalboard.get() and self.use_rir.get()):
+            if source == 'pedalboard':
+                self.use_rir.set(False)
+                print("Pedalboard is selected") 
+            else:
+                self.use_pedalboard.set(False)
+                print("RIR is selected")
+            
         
     def update_room_size(self, value):
         self.room_size = float(value)
@@ -276,17 +323,28 @@ class ReverbProcessor:
         self.update_reverb()
         
     def update_reverb(self):
-        # 更新效果器参数
-        self.board = Pedalboard([
-            HighpassFilter(cutoff_frequency_hz=100.0),    # 移除100 Hz以下低频噪声
-            LowpassFilter(cutoff_frequency_hz=5000.0),   
-            Reverb(
-                room_size=self.room_size,
-                wet_level=self.wet_level,
-                damping=self.damping,
-                width=self.width
-            )
-        ])
+        if self.use_pedalboard.get():
+            # 更新效果器参数
+            self.board = Pedalboard([
+                HighpassFilter(cutoff_frequency_hz=100.0),    # 移除100Hz以下低频噪声
+                LowpassFilter(cutoff_frequency_hz=5000.0),   
+                Reverb(
+                    room_size=self.room_size,
+                    wet_level=self.wet_level,
+                    damping=self.damping,
+                    width=self.width
+                )
+            ])
+        elif self.use_rir.get():
+            self.h = rir.generate(
+                        c=340,
+                        fs=self.RATE,
+                        L=self.room_dim,
+                        s=self.source_pos,
+                        r=self.receiver_pos,
+                        reverberation_time=self.rt60,
+                        nsample=1024)
+            self.h = self.h.reshape(-1,1)
     
     def toggle_recording(self):
         self.is_recording = not self.is_recording
