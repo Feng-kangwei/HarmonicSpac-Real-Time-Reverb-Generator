@@ -46,7 +46,7 @@ class ReverbProcessor:
         self.source_pos = [2, 3.5, 2]
         self.receiver_pos = [2, 1.5, 2]
         self.rt60 = 0.4
-
+        self.conv_gain = 5.0
         # rir generator
         self.h = rir.generate(
                 c=340,
@@ -101,6 +101,7 @@ class ReverbProcessor:
                 # 使用rir generator处理
                 processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
                 processed = processed.astype(np.float32)
+                processed = processed * self.conv_gain
             else :
                 # print("No algorithm selected")
                 processed = audio_data
@@ -152,7 +153,7 @@ class ReverbProcessor:
             command=lambda : self.on_algorithm_change('rir')
         ).pack(padx=5, pady=2)
         
-        pedalboard_frame = ttk.LabelFrame(control_frame, text="Pedalboard Parameters")
+        pedalboard_frame = ttk.LabelFrame(control_frame, text="Schroeder Parameters")
         pedalboard_frame.pack(pady=10, padx=5, fill="x")
 
         # Room Size滑块
@@ -192,10 +193,16 @@ class ReverbProcessor:
         self.width_slider.pack()
 
         # frame for rir generator
-        rir_frame = ttk.LabelFrame(control_frame, text="RIR Generator Parameters")
+        rir_frame = ttk.LabelFrame(control_frame, text="Convolution Parameters")
         rir_frame.pack(pady=10, padx=5, fill="x")
 
-        
+        # add combo box
+        ttk.Label(rir_frame, text="Room Size Choose").pack()
+        self.room_choice_combo = ttk.Combobox(rir_frame, values=["Room", "Large Hall", "Church", "Theater"], state="readonly")
+        self.room_choice_combo.pack()
+
+        self.room_choice_combo.current(0)
+        self.room_choice_combo.bind("<<ComboboxSelected>>", self.update_room_choice)
         
         # 启动按钮
         self.start_button = ttk.Button(control_frame, text="Start", command=self.toggle_processing)
@@ -360,6 +367,43 @@ class ReverbProcessor:
                         nsample=1024)
             self.h = self.h.reshape(-1,1)
     
+    def update_room_choice(self, event):
+        room = self.room_choice_combo.get()
+        if room == "Room":
+            self.room_dim = [5, 4, 6]
+            self.source_pos = [2, 3.5, 2]
+            self.receiver_pos = [2, 1.5, 2]
+            self.rt60 = 0.4
+            self.conv_gain = 5.0
+
+        elif room == "Large Hall":
+            self.room_dim = [10, 8, 12]
+            self.source_pos = [5, 7, 5]
+            self.receiver_pos = [5, 3, 5]
+            self.rt60 = 1.2
+            self.conv_gain = 10.0
+
+        elif room == "Church":
+            self.room_dim = [15, 12, 18]
+            self.source_pos = [7.5, 10.5, 7.5]
+            self.receiver_pos = [7.5, 4.5, 7.5]
+            self.rt60 = 2.0
+            self.conv_gain = 15.0
+
+        elif room == "Theater":
+            self.room_dim = [20, 16, 24]
+            self.source_pos = [10, 14, 10]
+            self.receiver_pos = [10, 6, 10]
+            self.rt60 = 2.5
+            self.conv_gain = 20.0  
+            
+        else:
+            print("No room selected")
+            return
+        
+        self.update_reverb()
+
+
     def toggle_recording(self):
         self.is_recording = not self.is_recording
         self.record_button.config(text="Stop Recording" if self.is_recording else "Record Audio")
