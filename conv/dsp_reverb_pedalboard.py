@@ -9,11 +9,13 @@ from pedalboard import Pedalboard, Reverb, HighpassFilter, LowpassFilter
 import wave
 import rir_generator as rir
 import scipy.signal as ss
+import queue
+import threading
 
 class ReverbProcessor:
     def __init__(self):
         # 音频参数
-        self.CHUNK = 8192
+        self.CHUNK = 4096 
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1
         self.RATE = 16000
@@ -79,7 +81,49 @@ class ReverbProcessor:
         except Exception as e:
             messagebox.showerror("错误", f"音频设备初始化失败: {str(e)}")
             raise
+        
+        # 启动音频处理线程
+        self.input_queue = queue.Queue(maxsize=10)
+        self.output_queue = queue.Queue(maxsize=10)
+        self.processing_thread_running = True
+        self.processing_thread = threading.Thread(target=self.process_audio)
+        self.processing_thread.start()
+
+    def process_audio(self):
+        while self.processing_thread_running:
+            try:
+                # 从输入队列中获取数据
+                audio_data = self.input_queue.get(timeout=0.1)
+                if self.use_pedalboard.get():
+                    # 将一维数据转换为二维数据 (1, samples)
+                    audio_data = np.expand_dims(audio_data, axis=0)
+                    # 使用 Pedalboard 处理
+                    processed = self.board(audio_data, self.RATE)
+                    print("Processing Thread: Processed using schroeder")
+                elif self.use_rir.get(): 
+                    # 使用rir generator处理
+                    
+                    processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
+                    processed = processed.astype(np.float32)
+                    processed = processed * self.conv_gain
+                    print("Processing Thread: Processed using Convolution")
+                else :
+                    print("Processing Thread: No algorithm selected")
+                    processed = audio_data
+                
+                # 将处理后的数据放入输出队列
+                self.output_queue.put(processed)
+            except queue.Empty:
+                print("Processing Thread: No data in input queue")
+                pass
+            except Exception as e:
+                print(f"音频处理线程错误: {e}")
+                break
     
+    def stop_processing_thread(self):
+        self.processing_thread_running = False
+        if hasattr(self, 'processing_thread'):
+            self.processing_thread.join()
 
     def audio_callback(self, in_data, frame_count, time_info, status):
         try:
@@ -90,22 +134,16 @@ class ReverbProcessor:
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
             
+            # 将数据放入输入队列
+            self.input_queue.put(audio_data)
 
-            if (self.use_pedalboard.get()):
-                # 将一维数据转换为二维数据 (1, samples)
-                audio_data = np.expand_dims(audio_data, axis=0)
-                    
-                # 使用 Pedalboard 处理
-                processed = self.board(audio_data, self.RATE)
-            elif (self.use_rir.get()): 
-                # 使用rir generator处理
-                processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
-                processed = processed.astype(np.float32)
-                processed = processed * self.conv_gain
-            else :
-                # print("No algorithm selected")
-                processed = audio_data
-            
+            # 从输出队列中获取处理后的数据
+            if not self.output_queue.empty():
+                processed = self.output_queue.get_nowait()
+            else:
+                print("Main Thread: No data in output queue")
+                processed = np.zeros_like(audio_data)
+
             # 更新数据缓冲
             self.input_data = audio_data
             self.output_data = processed
@@ -396,7 +434,7 @@ class ReverbProcessor:
             self.receiver_pos = [10, 6, 10]
             self.rt60 = 2.5
             self.conv_gain = 20.0  
-            
+
         else:
             print("No room selected")
             return
@@ -451,13 +489,39 @@ class ReverbProcessor:
             wf.writeframes(data_int.tobytes())
 
     def on_closing(self):
-        self.running = False
-        if hasattr(self, 'stream'):
-            self.stream.stop_stream()
-            self.stream.close()
-        if hasattr(self, 'p'):
-            self.p.terminate()
-        self.root.destroy()
+        try:
+            # 1. 停止主循环标志
+            self.running = False
+            
+            # 2. 停止动画
+            if hasattr(self, 'ani'):
+                self.ani.event_source.stop()
+            
+            # 3. 停止处理线程
+            self.stop_processing_thread()
+            
+            # 4. 清空队列
+            while not self.input_queue.empty():
+                self.input_queue.get_nowait()
+            while not self.output_queue.empty():
+                self.output_queue.get_nowait()
+                
+            # 5. 关闭音频流
+            if hasattr(self, 'stream'):
+                self.stream.stop_stream()
+                self.stream.close()
+                
+            # 6. 终止PyAudio
+            if hasattr(self, 'p'):
+                self.p.terminate()
+                
+            # 7. 关闭窗口
+            plt.close('all')  # 关闭所有matplotlib窗口
+            self.root.quit()  # 退出mainloop
+            self.root.destroy()  # 销毁窗口
+            
+        except Exception as e:
+            print(f"关闭程序时出错: {str(e)}")
         
     def run(self):
             
