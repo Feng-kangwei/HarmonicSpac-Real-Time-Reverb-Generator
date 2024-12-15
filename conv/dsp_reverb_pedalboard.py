@@ -10,8 +10,6 @@ import wave
 import rir_generator as rir
 import scipy.signal as ss
 
-
-
 class ReverbProcessor:
     def __init__(self):
         # 音频参数
@@ -43,6 +41,7 @@ class ReverbProcessor:
             )
         ])
 
+        # RIR Generator 参数
 
         # rir generator
         self.h = rir.generate(
@@ -53,17 +52,15 @@ class ReverbProcessor:
                 L=[5, 4, 6],
                 reverberation_time=0.4,
                 nsample=1024)
+    
         self.h = self.h.reshape(-1,1)
 
-        
-        self.debug = True  # 添加调试标志
         
         self.is_recording = False
         self.recorded_input = []
         self.recorded_output = []
 
     
-
         try:
             # 初始化PyAudio
             self.p = pyaudio.PyAudio()
@@ -86,7 +83,6 @@ class ReverbProcessor:
         try:
             # 处理输入数据
             audio_data = np.frombuffer(in_data, dtype=np.float32)
-            print("Input max abs:", np.max(np.abs(audio_data)))
             
             # # 将一维数据转换为二维数据 (1, samples)
             # audio_data = np.expand_dims(audio_data, axis=0)
@@ -94,27 +90,9 @@ class ReverbProcessor:
             # # 使用 Pedalboard 处理
             # processed = self.board(audio_data, self.RATE)
 
-            # 将audio date 转换成 int16
-            audio_data_int16 = (audio_data * 32767).astype(np.int16)
-
-
             # 使用rir generator处理
-            processed = ss.convolve(audio_data_int16, self.h[:,0], mode='full')[:len(audio_data_int16)]
-
-
-            # 计算处理后数据的最大值
-            max_val = np.max(np.abs(processed))
-
-            if max_val == 0:
-                # 若全为0, 则直接输出原始数据
-                print("全为0")
-                processed = audio_data_int16.copy()
-            else:
-                # 进行归一化（保持输出为 int16）
-                print("max_val:", max_val)
-                normalized = (processed / max_val) * 32767
-                processed = normalized.astype(np.int16)
-
+            processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
+            processed = processed.astype(np.float32)
                 
             # 更新数据缓冲
             self.input_data = audio_data
@@ -358,8 +336,6 @@ class ReverbProcessor:
         self.root.destroy()
         
     def run(self):
-        if self.debug:
-            print("启动动画更新...")
             
         self.ani = FuncAnimation(
             self.fig,
@@ -370,9 +346,6 @@ class ReverbProcessor:
             cache_frame_data=False,  # 禁用帧缓存
             save_count=None  # 不保存帧
         )
-        
-        if self.debug:
-            print("开始主循环...")
             
         self.root.mainloop()
 
