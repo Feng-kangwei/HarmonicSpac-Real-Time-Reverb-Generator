@@ -15,7 +15,7 @@ import threading
 class ReverbProcessor:
     def __init__(self):
         # 音频参数
-        self.CHUNK = 4096 
+        self.CHUNK = 4096*2 
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1
         self.RATE = 16000
@@ -99,10 +99,10 @@ class ReverbProcessor:
                     audio_data = np.expand_dims(audio_data, axis=0)
                     # 使用 Pedalboard 处理
                     processed = self.board(audio_data, self.RATE)
+                    processed = processed.flatten()
                     print("Processing Thread: Processed using schroeder")
                 elif self.use_rir.get(): 
                     # 使用rir generator处理
-                    
                     processed = ss.convolve(audio_data.flatten(), self.h.flatten(), mode='same')
                     processed = processed.astype(np.float32)
                     processed = processed * self.conv_gain
@@ -172,7 +172,7 @@ class ReverbProcessor:
         control_frame.pack(side=tk.LEFT, padx=10)
 
         # 使用自定义样式的ALGORITHM选择框架
-        algorithm_frame = ttk.LabelFrame(control_frame, text="Algorithm Choose")
+        algorithm_frame = ttk.LabelFrame(control_frame, text="Algorithm Choice")
         algorithm_frame.pack(pady=10, padx=15, fill="x")
         algorithm_frame.config(width=200, height=100)
 
@@ -236,7 +236,8 @@ class ReverbProcessor:
 
         # add combo box
         ttk.Label(rir_frame, text="Room Size Choose").pack()
-        self.room_choice_combo = ttk.Combobox(rir_frame, values=["Room", "Large Hall", "Church", "Theater"], state="readonly")
+        # self.room_choice_combo = ttk.Combobox(rir_frame, values=["Room", "Large Hall", "Church", "Theater"], state="readonly")
+        self.room_choice_combo = ttk.Combobox(rir_frame, values=["Room", "Large Hall"], state="readonly")
         self.room_choice_combo.pack()
 
         self.room_choice_combo.current(0)
@@ -327,10 +328,13 @@ class ReverbProcessor:
             output_data_1d = self.output_data[0] if self.output_data.ndim > 1 else self.output_data
 
             # 更新时域图，采样数据
+            print(input_data_1d.shape)
+            print(input_data_1d[sampled_indices].shape)
             self.input_time_line.set_data(time,input_data_1d[sampled_indices])
             self.output_time_line.set_data(time, output_data_1d[sampled_indices])
 
             # 更新频域图
+            
             input_fft = np.abs(np.fft.rfft(input_data_1d))
             output_fft = np.abs(np.fft.rfft(output_data_1d))
 
@@ -395,6 +399,7 @@ class ReverbProcessor:
                 )
             ])
         elif self.use_rir.get():
+
             self.h = rir.generate(
                         c=340,
                         fs=self.RATE,
@@ -413,27 +418,34 @@ class ReverbProcessor:
             self.receiver_pos = [2, 1.5, 2]
             self.rt60 = 0.4
             self.conv_gain = 5.0
-
+        
         elif room == "Large Hall":
-            self.room_dim = [10, 8, 12]
-            self.source_pos = [5, 7, 5]
-            self.receiver_pos = [5, 3, 5]
-            self.rt60 = 1.2
-            self.conv_gain = 10.0
+            self.room_dim = [20, 20, 20]
+            self.source_pos = [2, 3.5, 2]
+            self.receiver_pos = [2, 1.5, 2]
+            self.rt60 = 0.9
+            self.conv_gain = 5.0
 
-        elif room == "Church":
-            self.room_dim = [15, 12, 18]
-            self.source_pos = [7.5, 10.5, 7.5]
-            self.receiver_pos = [7.5, 4.5, 7.5]
-            self.rt60 = 2.0
-            self.conv_gain = 15.0
+        # elif room == "Large Hall":
+        #     self.room_dim = [10, 8, 12]
+        #     self.source_pos = [5, 7, 5]
+        #     self.receiver_pos = [5, 3, 5]
+        #     self.rt60 = 1.2
+        #     self.conv_gain = 10.0
 
-        elif room == "Theater":
-            self.room_dim = [20, 16, 24]
-            self.source_pos = [10, 14, 10]
-            self.receiver_pos = [10, 6, 10]
-            self.rt60 = 2.5
-            self.conv_gain = 20.0  
+        # elif room == "Church":
+        #     self.room_dim = [15, 12, 18]
+        #     self.source_pos = [7.5, 10.5, 7.5]
+        #     self.receiver_pos = [7.5, 4.5, 7.5]
+        #     self.rt60 = 2.0
+        #     self.conv_gain = 15.0
+
+        # elif room == "Theater":
+        #     self.room_dim = [20, 16, 24]
+        #     self.source_pos = [10, 14, 10]
+        #     self.receiver_pos = [10, 6, 10]
+        #     self.rt60 = 2.5
+        #     self.conv_gain = 20.0  
 
         else:
             print("No room selected")
@@ -467,11 +479,11 @@ class ReverbProcessor:
             output_file = input_file.replace(".wav", "_processed.wav")
             
             # 保存输入和输出
-            self._save_wav(input_file, np.concatenate(self.recorded_input))
-            self._save_wav(output_file, np.concatenate(self.recorded_output))
+            self._save_wav(input_file, np.array(self.recorded_input))
+            self._save_wav(output_file, np.array(self.recorded_output))
                 
             messagebox.showinfo("Success", 
-                f"Audio Saved:\nInput Audio: {input_file}\nOutput Audio: {output_file}")
+                f"Audio Saved:\nInput Audio: {input_file}\n\nOutput Audio: {output_file}")
 
     def _save_wav(self, filename, data):
         """保存WAV文件"""
