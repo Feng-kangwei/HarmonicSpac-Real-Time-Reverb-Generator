@@ -1,0 +1,9 @@
+numpy>=1.21.0
+scipy>=1.7.0
+pyaudio>=0.2.11
+pedalboard>=0.1.0
+threading
+queue
+tkinter
+matplotlib>=3.4.0
+sounddevice>=0.4.1
